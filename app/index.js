@@ -213,25 +213,31 @@ client.on('interactionCreate', async interaction => {
 });
 
 async function handleCheck(interaction, paypayUrl) {
-    // 1. 処理中のEmbedを表示
+    // 1. 処理中のEmbedをチャンネルに直接送信 (send)
     const processingEmbed = new MessageEmbed()
         .setColor('#2F3136')
         .setTitle('処理中...')
         .setDescription('✅ ・ 送金情報を取得しています...\n✅ ・ 送金者のアカウント情報を取得しています...');
 
-    // スラッシュコマンドへの応答（すでにreply済みの場合はeditReply）
-    const message = interaction.replied || interaction.deferred
-        ? await interaction.editReply({ embeds: [processingEmbed], components: [] })
-        : await interaction.reply({ embeds: [processingEmbed], fetchReply: true });
+    // スラッシュコマンド自体には「受け付けた」という非表示の応答を返す（これをしないとコマンドがタイムアウトエラーになります）
+    if (!interaction.replied && !interaction.deferred) {
+        await interaction.reply({ content: 'チェックを開始しました。', ephemeral: true });
+    }
 
-    // 演出のために少し待機（任意）
+    // 処理中メッセージを送信し、変数に保存
+    const processingMsg = await interaction.channel.send({ embeds: [processingEmbed] });
+
+    // 演出のために少し待機
     await new Promise(resolve => setTimeout(resolve, 1500));
 
     // 2. データ取得
     const data = await getPayPayInfo(paypayUrl);
 
+    // データ取得に失敗した場合
     if (!data || !data.payload) {
-        return interaction.editReply({ content: 'リンク情報の取得に失敗しました。有効期限切れか無効なURLです。', embeds: [] });
+        // 処理中のメッセージを削除
+        await processingMsg.delete().catch(() => {});
+        return interaction.channel.send({ content: '❌ リンク情報の取得に失敗しました。' });
     }
 
     const payload = data.payload;
@@ -257,6 +263,8 @@ async function handleCheck(interaction, paypayUrl) {
                 .setStyle('DANGER'),
         );
 
+    // 4. 処理中のメッセージを削除し、結果を送信
+    await processingMsg.delete().catch(() => {}); // メッセージが既に消されていた場合のエラー防止
     await interaction.channel.send({ embeds: [resultEmbed], components: [row] });
 }
 
