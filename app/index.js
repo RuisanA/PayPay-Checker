@@ -257,7 +257,7 @@ async function handleCheck(interaction, paypayUrl) {
                 .setStyle('DANGER'),
         );
 
-    await interaction.message.send({ embeds: [resultEmbed], components: [row] });
+    await interaction.channel.send({ embeds: [resultEmbed], components: [row] });
 }
 
 process.on('uncaughtException', (error) => {
